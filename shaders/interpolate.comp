@@ -1,0 +1,44 @@
+#version 450
+// ChronoFlow experimental bidirectional interpolation shader.
+// Input flow is current -> previous in PIXELS (RG32F), defined in current space.
+// This shader consumes a FUTURE frame; it cannot reduce input latency.
+// Each sampled image must have its correct layout and synchronization arranged
+// by the host; output RGBA8 storage image must be in GENERAL layout.
+layout(local_size_x=8,local_size_y=8,local_size_z=1) in;
+layout(set=0,binding=0) uniform sampler2D previousColor;
+layout(set=0,binding=1) uniform sampler2D currentColor;
+layout(set=0,binding=2) uniform sampler2D currentToPreviousFlow;
+layout(set=0,binding=3) uniform sampler2D confidenceTex;
+layout(set=0,binding=4, rgba8) writeonly uniform image2D generatedFrame;
+layout(push_constant) uniform Controls {
+  float alpha;
+  float minimumConfidence;
+  float maxFlowPixels;
+  uint width;
+  uint height;
+} params;
+void main() {
+  ivec2 p=ivec2(gl_GlobalInvocationID.xy);
+  if(p.x>=int(params.width)||p.y>=int(params.height)) return;
+  vec2 size=vec2(params.width,params.height);
+  vec2 flow=texelFetch(currentToPreviousFlow,p,0).rg;
+  float conf=texelFetch(confidenceTex,p,0).r;
+  vec4 fallback=texelFetch(currentColor,p,0);
+  bool sane=!any(isnan(flow))&&!any(isinf(flow)) &&
+            !isnan(conf)&&!isinf(conf) &&
+            length(flow)<=params.maxFlowPixels && conf>=params.minimumConfidence;
+  vec2 pxy=vec2(p)+params.alpha*flow;
+  vec2 cxy=vec2(p)-(1.-params.alpha)*flow;
+  bool inBounds=all(greaterThanEqual(pxy,vec2(0)))&&
+                all(greaterThanEqual(cxy,vec2(0)))&&
+                all(lessThanEqual(pxy,size-1.))&&all(lessThanEqual(cxy,size-1.));
+  vec4 result=fallback;
+  if(params.alpha<=0.) result=texelFetch(previousColor,p,0);
+  else if(params.alpha>=1.) result=fallback;
+  else if(sane&&inBounds) {
+    vec4 a=texture(previousColor,(pxy+.5)/size);
+    vec4 b=texture(currentColor,(cxy+.5)/size);
+    result=mix(a,b,params.alpha);
+  }
+  imageStore(generatedFrame,p,result);
+}
