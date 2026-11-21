@@ -1,35 +1,38 @@
-# ChronoFlow Universal — SDK v0.3 (experimental)
+# ChronoFlow Universal — SDK v0.4 (experimental)
 
-**Objetivo:** uma biblioteca reutilizável que qualquer desenvolvedor possa incorporar, com permissão da licença, ao próprio emulador, port ou motor de jogo. O ChronoFlow **não** é um app que se injeta em outros jogos.
+ChronoFlow is an open-source C++17 library designed for developers to **integrate
+into their own emulator, Android port or game engine**. It is NOT an app that
+injects code into closed-source games.
 
-[Guia de integração](docs/INTEGRATION.md) · [API pública](include/chronoflow/chronoflow.h) · [Exemplo C](examples/integration_example.c)
+## Current status
+- Portable C ABI and C++17 performance policy, FPS/time management and host callbacks.
+- **Tested CPU reference frame interpolation** using backward motion vectors.
+- **Experimental Vulkan compute integration** for host-provided images and flow;
+  actual device validation and performance measurements are still pending.
+- CMake and CI builds with optional Vulkan, portable tests and a C example.
 
-## O que já existe
-- Core C++17 com interface binária C99, sem dependências gráficas;
-- sugestão de FPS real, FPS apresentado, escala e habilitação condicional de gerador externo;
-- relógio de simulação com backlog explícito: não mascara câmera lenta;
-- callbacks de integração fornecidos pelo desenvolvedor;
-- testes e exemplo com CI em Linux.
+## What it does NOT yet do
+No standalone frame-generation APK, universal emulator compatibility, automatic
+optical-flow estimation, swapchain integration, input latency reduction, or
+proven GPU performance gains. Interpolation is not an engine speedup and
+does not correct slow emulation clocks on its own.
 
-## O que ainda NÃO existe
-- injeção genérica, driver Vulkan, compositor de imagens, rede neural ou APK;
-- frame generation real, motion estimation ou compatibilidade certificada com emuladores;
-- aumento de FPS real ou correção universal de jogos em câmera lenta.
-
-## Compilar
+## Build & tests
 ```sh
 cmake -S . -B build
 cmake --build build
 ctest --test-dir build --output-on-failure
-./build/cf_example
 ```
+For Vulkan: `cmake -S . -B build -DCF_ENABLE_VULKAN=ON`.
+Host must supply Vulkan SDK/Android NDK and glslangValidator to compile GLSL shader.
 
-Build Android: use NDK + CMake com `-DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-26`. O SDK gera biblioteca estática para integração no host; não cria um APK sozinho.
+## Integrate
+- [Host SDK](include/chronoflow/chronoflow.h)
+- [CPU interpolator API](include/chronoflow/reprojection.h)
+- [Vulkan bridge API](include/chronoflow/vulkan_bridge.h)
+- [Vulkan integration contract](docs/VULKAN.md)
+- [Host integration](docs/INTEGRATION.md)
+- [C example](examples/integration_example.c)
 
-## Compatibilidade
-Qualquer projeto que possa compilar C++17 e chamar uma API C pode experimentar o núcleo, mas os resultados dependem dos dados e recursos fornecidos pelo host. O suporte gráfico real exigirá adaptadores específicos. Consulte a documentação.
-
-## Política de contribuições
-Pull requests com adaptadores, benchmarks reproduzíveis, testes de latência, shaders e otimizações são bem-vindos. Evite prometer melhorias sem medições no dispositivo.
-
-Licença: MIT. Código histórico v0.1/v0.2 será importado separadamente como material experimental, sem afirmar equivalência ao SDK.
+**License:** MIT. Previous v0.1/v0.2 experiments are research references;
+this branch implements a portable API and GPU path, not a production driver.
